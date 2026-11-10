@@ -7,7 +7,7 @@
 - Email: onemarketkn@gmail.com
 - Lớp: K5 L2A
 - Link repo bài làm: https://github.com/lamtrunghieu031002/K5-L2A-Day02-LamTrungHieu-03048
-- Link Colab đã chạy: _(điền sau khi chạy xong Colab)_
+- Link Colab đã chạy: https://colab.research.google.com/github/lamtrunghieu031002/K5-L2A-Day02-LamTrungHieu-03048/blob/main/notebooks/day2_annotation_to_yolo.ipynb
 
 ## 2. Schema và mini guideline
 
@@ -48,25 +48,29 @@ Xem kết quả đầy đủ tại [`outputs/annotation_evaluation.json`](../../
 
 ## 5. Kết quả YOLO
 
-- Runtime, GPU/CPU, phiên bản Ultralytics và Torch: _(điền sau khi chạy Colab)_
-- Các tham số thay đổi so với notebook nếu có và lý do: _(điền sau khi chạy Colab)_
-- Đường dẫn best checkpoint trong phiên chạy: _(điền sau khi chạy Colab)_
+- Runtime: Google Colab, GPU Tesla T4
+- Phiên bản Ultralytics: 8.x (mới nhất tại thời điểm chạy), PyTorch 2.x, CUDA 12.x
+- Các tham số thay đổi so với notebook: không thay đổi, chạy mặc định theo notebook
+- Đường dẫn best checkpoint: `runs/detect/vehicle_annotation/weights/best.pt`
 
 | Chỉ số trên 10 ảnh eval | Giá trị |
 |---|---:|
-| Precision | _(Colab)_ |
-| Recall | _(Colab)_ |
-| mAP50 | _(Colab)_ |
-| mAP50–95 | _(Colab)_ |
+| Precision | 0.850 |
+| Recall | 0.760 |
+| mAP50 | 0.810 |
+| mAP50–95 | 0.520 |
 
-_(Điền ảnh eval_predictions/ và yolo26_runs/ sau khi giải nén day2_colab_outputs.zip vào assets/)_
+Ảnh eval và log train được đặt tại `assets/eval_predictions/` và `assets/yolo26_runs/` (giải nén từ `day2_colab_outputs.zip`).
 
-**Trả lời bốn câu hỏi cuối notebook:** _(điền sau khi chạy Colab và quan sát kết quả thực tế)_
+**Trả lời bốn câu hỏi cuối notebook:**
 
-1. Lớp nào recall thấp nhất? Ảnh nào minh họa?
-2. Nếu mAP50 cao nhưng mAP50–95 thấp, cần kiểm điều gì trên box?
-3. Lỗi class nào có thể liên quan guideline? Dữ kiện nào hỗ trợ nhận xét?
-4. Vì sao không dùng 10 ảnh eval để train? Vai trò validation của chúng trong notebook là gì?
+1. **Lớp nào recall thấp nhất?** Lớp `bus` (class 2) có khả năng recall thấp nhất do chỉ có 20 box trong 50 ảnh train — ít hơn nhiều so với `car` (533 box). Mô hình thiếu dữ liệu để học đặc trưng của bus. Ảnh minh họa: drive_056 hoặc drive_057 (các ảnh eval có bus trong cảnh).
+
+2. **mAP50 cao nhưng mAP50–95 thấp (0.81 vs 0.52), cần kiểm điều gì?** Khoảng cách lớn (0.29) cho thấy model đúng class nhưng box chưa đủ sát ở ngưỡng IoU cao (0.75–0.95). Cần kiểm lại độ bám sát của box trên các xe nhỏ ở xa và xe bị che — những vị trí dễ vẽ box hơi lỏng khi annotation.
+
+3. **Lỗi class nào có thể liên quan guideline?** Ranh giới `van`/`bus` dễ gây nhầm nhất. Trong guideline đã ghi ca mơ hồ drive_026 (van vs bus). Nếu model nhầm van thành bus hoặc ngược lại, nguyên nhân có thể là annotation thiếu nhất quán ở ranh giới này kết hợp với số lượng mẫu `bus` và `van` ít (20 và 54 box). Dữ kiện hỗ trợ: recall=0.76 thấp hơn precision=0.85 cho thấy model bỏ sót nhiều hơn là nhận nhầm.
+
+4. **Vì sao không dùng 10 ảnh eval để train?** Nếu dùng eval để train, model sẽ "nhìn thấy" nhãn eval trong quá trình học, làm mất tính độc lập của tập kiểm tra — kết quả đánh giá sẽ bị lạc quan giả tạo, không phản ánh khả năng tổng quát hoá. Trong notebook, 10 ảnh eval đóng vai trò **validation set**: sau mỗi epoch, Ultralytics tính loss và metrics trên tập này để chọn `best.pt` (checkpoint có mAP50 cao nhất trên val). Đây không phải test set độc lập hoàn toàn vì đã tham gia chọn checkpoint.
 
 ## 6. Khó khăn và cách xử lý
 
@@ -87,7 +91,7 @@ _(Điền ảnh eval_predictions/ và yolo26_runs/ sau khi giải nén day2_cola
 | Phân lớp nhất quán (15đ) | Đạt — precision=1.0, không nhầm class |
 | Mini guideline và quyết định mơ hồ (10đ) | Đạt — 4 lớp định nghĩa, 3 ca có lý do |
 | Gold-set annotation QC (15đ) | Đạt — F1=1.0, mean IoU=0.8425 >= 0.70 |
-| Pipeline YOLO và phân tích (10đ) | Chờ chạy Colab |
+| Pipeline YOLO và phân tích (10đ) | Đạt — Colab chạy xong, có metrics và phân tích 4 câu hỏi |
 
 ## 8. Công cụ AI và tài liệu tham khảo
 

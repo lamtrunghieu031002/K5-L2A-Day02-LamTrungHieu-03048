@@ -48,29 +48,38 @@ Xem kết quả đầy đủ tại [`outputs/annotation_evaluation.json`](../../
 
 ## 5. Kết quả YOLO
 
-- Runtime: Google Colab, GPU Tesla T4
-- Phiên bản Ultralytics: 8.x (mới nhất tại thời điểm chạy), PyTorch 2.x, CUDA 12.x
-- Các tham số thay đổi so với notebook: không thay đổi, chạy mặc định theo notebook
-- Đường dẫn best checkpoint: `runs/detect/vehicle_annotation/weights/best.pt`
+- Runtime: Local CPU (Intel Core i5-12450H), Ultralytics 8.4.208, PyTorch 2.15.0
+- Các tham số thay đổi so với notebook: `device='cpu'`, `batch=8`; không thay đổi epochs (50), imgsz (640), seed (20260909)
+- Đường dẫn best checkpoint: `runs/vehicle_annotation/weights/best.pt`
 
 | Chỉ số trên 10 ảnh eval | Giá trị |
 |---|---:|
-| Precision | 0.850 |
-| Recall | 0.760 |
-| mAP50 | 0.810 |
-| mAP50–95 | 0.520 |
+| Precision | 0.3904 |
+| Recall | 0.2413 |
+| mAP50 | 0.2744 |
+| mAP50–95 | 0.1856 |
 
-Ảnh eval và log train được đặt tại `assets/eval_predictions/` và `assets/yolo26_runs/` (giải nén từ `day2_colab_outputs.zip`).
+Per-class breakdown:
+
+| Lớp | Precision | Recall | mAP50 |
+|---|---:|---:|---:|
+| car | 0.771 | 0.682 | 0.751 |
+| truck | 0.634 | 0.200 | 0.275 |
+| bus | 0.000 | 0.000 | 0.013 |
+| van | 0.156 | 0.083 | 0.058 |
+
+Ảnh prediction trên 10 ảnh eval: [`assets/eval_predictions/visuals/`](assets/eval_predictions/visuals/drive_056.jpg)
+Log train và chỉ số model: [`assets/yolo26_runs/`](assets/yolo26_runs/vehicle_eval/confusion_matrix.png)
 
 **Trả lời bốn câu hỏi cuối notebook:**
 
-1. **Lớp nào recall thấp nhất?** Lớp `bus` (class 2) có khả năng recall thấp nhất do chỉ có 20 box trong 50 ảnh train — ít hơn nhiều so với `car` (533 box). Mô hình thiếu dữ liệu để học đặc trưng của bus. Ảnh minh họa: drive_056 hoặc drive_057 (các ảnh eval có bus trong cảnh).
+1. **Lớp nào recall thấp nhất?** `bus` với recall=0 và mAP50=0.013 — model hầu như không nhận ra bus nào. Nguyên nhân chính là class imbalance nghiêm trọng: chỉ có 20 box bus trong 50 ảnh train, trong khi car có 533. Model không học đủ đặc trưng của bus. Ảnh minh họa: `drive_051.jpg` có 1 bus nhưng model dự đoán nhầm thành van hoặc bỏ sót; `drive_052.jpg` có 2 bus tương tự.
 
-2. **mAP50 cao nhưng mAP50–95 thấp (0.81 vs 0.52), cần kiểm điều gì?** Khoảng cách lớn (0.29) cho thấy model đúng class nhưng box chưa đủ sát ở ngưỡng IoU cao (0.75–0.95). Cần kiểm lại độ bám sát của box trên các xe nhỏ ở xa và xe bị che — những vị trí dễ vẽ box hơi lỏng khi annotation.
+2. **mAP50 cao nhưng mAP50–95 thấp, cần kiểm điều gì trên box?** Với `car` mAP50=0.751 nhưng mAP50–95 thấp hơn đáng kể, cần kiểm độ bám sát (tightness) của box: box có thể đúng class và vị trí nhưng hơi rộng hơn thân xe. Ở ngưỡng IoU 0.75–0.95, một box hơi lỏng bị tính là FP. Các xe nhỏ hàng xa trong tập eval (mà annotation có thể hơi kém chính xác hơn xe lớn ở gần) đặc biệt dễ gặp vấn đề này.
 
-3. **Lỗi class nào có thể liên quan guideline?** Ranh giới `van`/`bus` dễ gây nhầm nhất. Trong guideline đã ghi ca mơ hồ drive_026 (van vs bus). Nếu model nhầm van thành bus hoặc ngược lại, nguyên nhân có thể là annotation thiếu nhất quán ở ranh giới này kết hợp với số lượng mẫu `bus` và `van` ít (20 và 54 box). Dữ kiện hỗ trợ: recall=0.76 thấp hơn precision=0.85 cho thấy model bỏ sót nhiều hơn là nhận nhầm.
+3. **Lỗi class nào có thể liên quan guideline?** `van` và `bus` dễ nhầm nhau nhất — cả hai đều có mAP50 rất thấp (0.058 và 0.013). Trong guideline đã ghi ca mơ hồ drive_026 (van vs bus). Confusion matrix cho thấy model có xu hướng dự đoán van thành car (vì car chiếm 82% box train). Nếu guideline không phân biệt rõ van với car (ví dụ: minivan nhỏ có thể bị gán nhầm thành car trong annotation), model sẽ học ranh giới sai. Dữ kiện hỗ trợ: recall van=0.083 thấp hơn nhiều so với car=0.682, cho thấy model bỏ sót van nhiều hơn là nhận nhầm.
 
-4. **Vì sao không dùng 10 ảnh eval để train?** Nếu dùng eval để train, model sẽ "nhìn thấy" nhãn eval trong quá trình học, làm mất tính độc lập của tập kiểm tra — kết quả đánh giá sẽ bị lạc quan giả tạo, không phản ánh khả năng tổng quát hoá. Trong notebook, 10 ảnh eval đóng vai trò **validation set**: sau mỗi epoch, Ultralytics tính loss và metrics trên tập này để chọn `best.pt` (checkpoint có mAP50 cao nhất trên val). Đây không phải test set độc lập hoàn toàn vì đã tham gia chọn checkpoint.
+4. **Vì sao không dùng 10 ảnh eval để train?** Nếu đưa eval vào train, model học trực tiếp trên nhãn eval — khi đánh giá lại trên cùng tập đó, kết quả sẽ bị lạc quan giả tạo (data leakage), không phản ánh khả năng tổng quát hoá trên dữ liệu chưa thấy. Trong notebook này, 10 ảnh eval đóng vai trò **validation set**: Ultralytics tính metrics sau mỗi epoch trên tập val để theo dõi convergence và lưu `best.pt` (checkpoint có val mAP50 cao nhất). Đây không phải test set độc lập hoàn toàn vì đã tham gia chọn checkpoint, nhưng vẫn tốt hơn nhiều so với dùng eval làm train.
 
 ## 6. Khó khăn và cách xử lý
 
